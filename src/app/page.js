@@ -1,11 +1,40 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start p-6 bg-gradient-to-b from-green-100 to-white text-gray-800">
+    <main className="flex min-h-screen flex-col items-center justify-start pb-6 bg-gradient-to-b from-green-100 to-white text-gray-800">
       
+      {/* Header Section */}
+      <section className="w-full" >
+      <nav className="flex justify-between px-8 py-4 shadow-md bg-white text-black text-opacity-50 fixed w-full top-0 z-50 " >
+        <Link href="/home">
+        <Image
+          src="/logo.png"
+          width={110}
+          height={5}
+          alt="Picture is loading"
+        ></Image>
+        </Link>
+        <div className="space-x-6 text-center m-4 text-base" >
+          <Link href="/" className="hover:text-red-600 ">HOME</Link>
+          <Link href="/" className="hover:text-red-600">ORDER</Link>
+          <Link href="/" className="hover:text-red-600">MENU</Link>
+          <Link href="/" className="hover:text-red-600">CONTACT</Link>
+        </div>
+        <div className="m-2 flex justify-center text-base">
+          <Link href="/UserLogin" className="mr-4" >
+          <button className="bg-red-500 rounded-lg p-1 pr-2 pl-2">LOGIN</button>
+          </Link>
+          <Link href="/UserSignup" className="">
+          <button className="bg-red-500 rounded-lg p-1">SIGNUP</button>
+          </Link>
+        </div>
+      </nav>
+      </section>
+
       {/* Hero Section */}
-      <section className="text-center mt-20">
+      <section className="text-center mt-40">
         <h1 className="text-5xl font-bold mb-4 text-green-700">Welcome to Canteen Mate</h1>
         <p className="text-lg max-w-xl mx-auto mb-6">
           Your smart companion to order, track, and enjoy your favorite meals from the campus canteen without waiting in line.
