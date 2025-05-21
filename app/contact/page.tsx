@@ -11,7 +11,8 @@ import {
   MapPin, 
   Clock, 
   Send,
-  AlertCircle
+  AlertCircle,
+  Check
 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
