@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { supabase } from "@/lib/supabase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, LogIn, UserPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Login form schema
 const loginFormSchema = z.object({
@@ -43,8 +46,8 @@ type RegisterFormValues = z.infer<typeof registerFormSchema>;
 export default function LoginPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [registerError, setRegisterError] = useState<string | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
   
   // Initialize login form
   const loginForm = useForm<LoginFormValues>({
@@ -67,33 +70,68 @@ export default function LoginPage() {
   });
 
   // Handle login form submission
-  const onLoginSubmit = (data: LoginFormValues) => {
-    setIsLoggingIn(true);
-    setLoginError(null);
-    
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Login submitted:", data);
-      setIsLoggingIn(false);
+  const onLoginSubmit = async (data: LoginFormValues) => {
+    try {
+      setIsLoggingIn(true);
       
-      // Redirect to home page after successful login
-      window.location.href = "/";
-    }, 1500);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "You have been logged in successfully.",
+      });
+
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to login",
+      });
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
   
   // Handle registration form submission
-  const onRegisterSubmit = (data: RegisterFormValues) => {
-    setIsRegistering(true);
-    setRegisterError(null);
-    
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Registration submitted:", data);
-      setIsRegistering(false);
+  const onRegisterSubmit = async (data: RegisterFormValues) => {
+    try {
+      setIsRegistering(true);
       
-      // Redirect to home page after successful registration
-      window.location.href = "/";
-    }, 1500);
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.name,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Please check your email to verify your account.",
+      });
+
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to register",
+      });
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   return (
@@ -112,13 +150,6 @@ export default function LoginPage() {
         <TabsContent value="login">
           <div className="bg-white p-8 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-6 text-center">Sign In</h2>
-            
-            {loginError && (
-              <div className="mb-6 bg-red-50 text-red-700 p-4 rounded-md flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                <span>{loginError}</span>
-              </div>
-            )}
             
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
@@ -181,13 +212,6 @@ export default function LoginPage() {
         <TabsContent value="register">
           <div className="bg-white p-8 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-6 text-center">Create Account</h2>
-            
-            {registerError && (
-              <div className="mb-6 bg-red-50 text-red-700 p-4 rounded-md flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                <span>{registerError}</span>
-              </div>
-            )}
             
             <Form {...registerForm}>
               <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-6">
