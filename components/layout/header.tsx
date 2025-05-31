@@ -1,13 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, X, ShoppingCart, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/layout/logo";
+import { supabase } from "@/lib/supabase";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -46,11 +66,20 @@ export default function Header() {
                 </span>
               </Button>
             </Link>
-            <Link href="/login">
-              <Button className="bg-red-600 hover:bg-red-700 text-white">
-                Login
-              </Button>
-            </Link>
+            {user ? (
+              <Link href="/profile">
+                <Button className="bg-red-600 hover:bg-red-700 text-white">
+                  <User className="h-5 w-5 mr-2" />
+                  Profile
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button className="bg-red-600 hover:bg-red-700 text-white">
+                  Login
+                </Button>
+              </Link>
+            )}
           </div>
           
           {/* Mobile menu button */}
@@ -109,13 +138,23 @@ export default function Header() {
             >
               CONTACT
             </Link>
-            <Link 
-              href="/login" 
-              className="block px-3 py-2 rounded-md text-base font-medium bg-red-600 text-white hover:bg-red-700 mt-4"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              LOGIN
-            </Link>
+            {user ? (
+              <Link 
+                href="/profile" 
+                className="block px-3 py-2 rounded-md text-base font-medium bg-red-600 text-white hover:bg-red-700 mt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                PROFILE
+              </Link>
+            ) : (
+              <Link 
+                href="/login" 
+                className="block px-3 py-2 rounded-md text-base font-medium bg-red-600 text-white hover:bg-red-700 mt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                LOGIN
+              </Link>
+            )}
           </div>
         </div>
       )}
