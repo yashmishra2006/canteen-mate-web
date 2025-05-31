@@ -20,7 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
 // Login form schema
@@ -46,6 +47,8 @@ type RegisterFormValues = z.infer<typeof registerFormSchema>;
 export default function LoginPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   
@@ -73,6 +76,7 @@ export default function LoginPage() {
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
       setIsLoggingIn(true);
+      setAuthError(null);
       
       const { error } = await supabase.auth.signInWithPassword({
         email: data.email,
@@ -89,11 +93,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to login",
-      });
+      setAuthError(error instanceof Error ? error.message : "Failed to login");
     } finally {
       setIsLoggingIn(false);
     }
@@ -103,6 +103,7 @@ export default function LoginPage() {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     try {
       setIsRegistering(true);
+      setAuthError(null);
       
       const { error } = await supabase.auth.signUp({
         email: data.email,
@@ -116,19 +117,15 @@ export default function LoginPage() {
 
       if (error) throw error;
 
+      setRegistrationSuccess(true);
+      registerForm.reset();
+      
       toast({
-        title: "Success",
-        description: "Please check your email to verify your account.",
+        title: "Registration Successful",
+        description: "Please check your email to verify your account before logging in.",
       });
-
-      router.push("/");
-      router.refresh();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to register",
-      });
+      setAuthError(error instanceof Error ? error.message : "Failed to register");
     } finally {
       setIsRegistering(false);
     }
@@ -150,6 +147,13 @@ export default function LoginPage() {
         <TabsContent value="login">
           <div className="bg-white p-8 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-6 text-center">Sign In</h2>
+            
+            {authError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
             
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
@@ -212,6 +216,22 @@ export default function LoginPage() {
         <TabsContent value="register">
           <div className="bg-white p-8 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-6 text-center">Create Account</h2>
+            
+            {authError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+
+            {registrationSuccess && (
+              <Alert className="mb-6 border-green-500 text-green-700">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  Registration successful! Please check your email to verify your account before logging in.
+                </AlertDescription>
+              </Alert>
+            )}
             
             <Form {...registerForm}>
               <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-6">
