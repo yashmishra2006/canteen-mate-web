@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Search, Filter, Plus, Minus } from "lucide-react";
+import { menuAPI, cartAPI, MenuItem } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
-// Food categories and items
+// Food categories
 const categories = [
   { id: "all", name: "All Items" },
   { id: "breakfast", name: "Breakfast" },
@@ -19,140 +21,132 @@ const categories = [
   { id: "desserts", name: "Desserts" },
 ];
 
-const menuItems = [
-  {
-    id: 1,
-    name: "Masala Dosa",
-    price: 80,
-    category: "breakfast",
-    image: "https://images.pexels.com/photos/5560763/pexels-photo-5560763.jpeg",
-    description: "Crispy rice pancake served with potato filling, sambar and chutney",
-    isVeg: true,
-    isPopular: true,
-  },
-  {
-    id: 2,
-    name: "Samosa",
-    price: 25,
-    category: "snacks",
-    image: "https://images.pexels.com/photos/9609838/pexels-photo-9609838.jpeg",
-    description: "Crispy pastry filled with spiced potatoes and peas",
-    isVeg: true,
-    isPopular: true,
-  },
-  {
-    id: 3,
-    name: "Chicken Biryani",
-    price: 150,
-    category: "lunch",
-    image: "https://images.pexels.com/photos/7390558/pexels-photo-7390558.jpeg",
-    description: "Fragrant basmati rice cooked with tender chicken and aromatic spices",
-    isVeg: false,
-    isPopular: true,
-  },
-  {
-    id: 4,
-    name: "Paneer Butter Masala",
-    price: 130,
-    category: "lunch",
-    image: "https://images.pexels.com/photos/3590401/pexels-photo-3590401.jpeg",
-    description: "Cottage cheese cubes in rich tomato and butter gravy",
-    isVeg: true,
-    isPopular: false,
-  },
-  {
-    id: 5,
-    name: "Masala Chai",
-    price: 20,
-    category: "beverages",
-    image: "https://images.pexels.com/photos/5946630/pexels-photo-5946630.jpeg",
-    description: "Traditional Indian spiced tea with milk",
-    isVeg: true,
-    isPopular: false,
-  },
-  {
-    id: 6,
-    name: "Gulab Jamun",
-    price: 40,
-    category: "desserts",
-    image: "https://images.pexels.com/photos/7449105/pexels-photo-7449105.jpeg",
-    description: "Sweet milk solids balls soaked in sugar syrup",
-    isVeg: true,
-    isPopular: false,
-  },
-  {
-    id: 7,
-    name: "Cold Coffee",
-    price: 60,
-    category: "beverages",
-    image: "https://images.pexels.com/photos/4271412/pexels-photo-4271412.jpeg",
-    description: "Refreshing cold coffee blended with ice and milk",
-    isVeg: true,
-    isPopular: false,
-  },
-  {
-    id: 8,
-    name: "Veg Pulao",
-    price: 100,
-    category: "lunch",
-    image: "https://images.pexels.com/photos/5410422/pexels-photo-5410422.jpeg",
-    description: "Fragrant rice cooked with mixed vegetables and spices",
-    isVeg: true,
-    isPopular: false,
-  },
-  {
-    id: 9,
-    name: "Egg Fried Rice",
-    price: 120,
-    category: "lunch",
-    image: "https://images.pexels.com/photos/723198/pexels-photo-723198.jpeg",
-    description: "Chinese style rice stir-fried with eggs and vegetables",
-    isVeg: false,
-    isPopular: true,
-  },
-];
-
 export default function MenuPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [cart, setCart] = useState<{ [key: number]: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [totalCartItems, setTotalCartItems] = useState(0);
+  const [totalCartValue, setTotalCartValue] = useState(0);
+  const { toast } = useToast();
 
-  // Filter menu items based on active tab and search query
-  const filteredItems = menuItems.filter(
-    (item) =>
-      (activeTab === "all" || item.category === activeTab) &&
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Load menu items
+  useEffect(() => {
+    const loadMenuItems = async () => {
+      setLoading(true);
+      const response = await menuAPI.getMenuItems();
+      if (response.success && response.data) {
+        setMenuItems(response.data);
+        setFilteredItems(response.data);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response.error || "Failed to load menu items",
+        });
+      }
+      setLoading(false);
+    };
+
+    loadMenuItems();
+  }, [toast]);
+
+  // Load cart data
+  useEffect(() => {
+    const loadCart = () => {
+      const cartItems = cartAPI.getCart();
+      const cartMap: { [key: number]: number } = {};
+      cartItems.forEach(item => {
+        cartMap[item.id] = item.quantity;
+      });
+      setCart(cartMap);
+      setTotalCartItems(cartAPI.getCartItemCount());
+      setTotalCartValue(cartAPI.getCartTotal());
+    };
+
+    loadCart();
+  }, []);
+
+  // Filter items based on active tab and search query
+  useEffect(() => {
+    let filtered = menuItems;
+
+    // Filter by category
+    if (activeTab !== "all") {
+      filtered = filtered.filter(item => item.category === activeTab);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredItems(filtered);
+  }, [menuItems, activeTab, searchQuery]);
 
   // Add item to cart
-  const addToCart = (itemId: number) => {
-    setCart((prevCart) => ({
-      ...prevCart,
-      [itemId]: (prevCart[itemId] || 0) + 1,
-    }));
+  const addToCart = async (item: MenuItem) => {
+    const response = await cartAPI.addToCart(item);
+    if (response.success) {
+      setCart(prevCart => ({
+        ...prevCart,
+        [item.id]: (prevCart[item.id] || 0) + 1,
+      }));
+      setTotalCartItems(cartAPI.getCartItemCount());
+      setTotalCartValue(cartAPI.getCartTotal());
+      toast({
+        title: "Added to Cart",
+        description: `${item.name} has been added to your cart.`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: response.error || "Failed to add item to cart",
+      });
+    }
   };
 
   // Remove item from cart
-  const removeFromCart = (itemId: number) => {
-    setCart((prevCart) => {
-      const updatedCart = { ...prevCart };
-      if (updatedCart[itemId] > 1) {
-        updatedCart[itemId] -= 1;
-      } else {
-        delete updatedCart[itemId];
+  const removeFromCart = async (itemId: number) => {
+    const currentQuantity = cart[itemId] || 0;
+    if (currentQuantity <= 1) {
+      const response = await cartAPI.removeFromCart(itemId);
+      if (response.success) {
+        setCart(prevCart => {
+          const newCart = { ...prevCart };
+          delete newCart[itemId];
+          return newCart;
+        });
       }
-      return updatedCart;
-    });
+    } else {
+      const response = await cartAPI.updateCartItem(itemId, currentQuantity - 1);
+      if (response.success) {
+        setCart(prevCart => ({
+          ...prevCart,
+          [itemId]: currentQuantity - 1,
+        }));
+      }
+    }
+    setTotalCartItems(cartAPI.getCartItemCount());
+    setTotalCartValue(cartAPI.getCartTotal());
   };
 
-  // Calculate total items in cart
-  const totalCartItems = Object.values(cart).reduce((sum, count) => sum + count, 0);
-
-  // Calculate total cart value
-  const totalCartValue = Object.entries(cart).reduce((sum, [itemId, count]) => {
-    const item = menuItems.find((item) => item.id === parseInt(itemId));
-    return sum + (item ? item.price * count : 0);
-  }, 0);
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading menu items...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -222,6 +216,9 @@ export default function MenuPage() {
                       {item.isPopular && (
                         <Badge className="bg-amber-500 hover:bg-amber-600">Popular</Badge>
                       )}
+                      {!item.isAvailable && (
+                        <Badge className="bg-gray-500">Out of Stock</Badge>
+                      )}
                     </div>
                   </div>
                   <CardContent className="pt-4">
@@ -244,8 +241,9 @@ export default function MenuPage() {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          onClick={() => addToCart(item.id)}
+                          onClick={() => addToCart(item)}
                           className="h-9 w-9"
+                          disabled={!item.isAvailable}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -253,9 +251,10 @@ export default function MenuPage() {
                     ) : (
                       <Button 
                         className="bg-red-600 hover:bg-red-700 text-white w-full"
-                        onClick={() => addToCart(item.id)}
+                        onClick={() => addToCart(item)}
+                        disabled={!item.isAvailable}
                       >
-                        Add to Cart
+                        {item.isAvailable ? "Add to Cart" : "Out of Stock"}
                       </Button>
                     )}
                   </CardFooter>

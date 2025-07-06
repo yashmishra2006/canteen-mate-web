@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { authAPI } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -76,25 +77,21 @@ export default function LoginPage() {
       setIsLoggingIn(true);
       setAuthError(null);
       
-      // Simulate login process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await authAPI.login(data.email, data.password);
       
-      // Store user data in localStorage for demo purposes
-      localStorage.setItem('user', JSON.stringify({
-        email: data.email,
-        name: 'Demo User',
-        isLoggedIn: true
-      }));
+      if (!response.success) {
+        throw new Error(response.error || "Login failed");
+      }
 
       toast({
         title: "Success",
-        description: "You have been logged in successfully.",
+        description: response.message || "You have been logged in successfully.",
       });
 
       router.push("/");
       router.refresh();
     } catch (error) {
-      setAuthError("Invalid email or password");
+      setAuthError(error instanceof Error ? error.message : "Failed to login");
     } finally {
       setIsLoggingIn(false);
     }
@@ -106,18 +103,21 @@ export default function LoginPage() {
       setIsRegistering(true);
       setAuthError(null);
       
-      // Simulate registration process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await authAPI.register(data.name, data.email, data.password);
+      
+      if (!response.success) {
+        throw new Error(response.error || "Registration failed");
+      }
 
       setRegistrationSuccess(true);
       registerForm.reset();
       
       toast({
         title: "Registration Successful",
-        description: "Your account has been created successfully. You can now log in.",
+        description: response.message || "Your account has been created successfully. You can now log in.",
       });
     } catch (error) {
-      setAuthError("Failed to create account");
+      setAuthError(error instanceof Error ? error.message : "Failed to register");
     } finally {
       setIsRegistering(false);
     }

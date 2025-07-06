@@ -16,59 +16,59 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-
-interface User {
-  email: string;
-  name: string;
-  isLoggedIn: boolean;
-}
+import { authAPI, cartAPI, User as UserType } from "@/lib/api";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserType | null>(null);
+  const [cartItemCount, setCartItemCount] = useState(0);
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
     const checkUser = () => {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        try {
-          const parsedUser = JSON.parse(userData);
-          if (parsedUser.isLoggedIn) {
-            setUser(parsedUser);
-          } else {
-            setUser(null);
-          }
-        } catch (error) {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+      const currentUser = authAPI.getCurrentUser();
+      setUser(currentUser);
+    };
+
+    const updateCartCount = () => {
+      const count = cartAPI.getCartItemCount();
+      setCartItemCount(count);
     };
 
     checkUser();
+    updateCartCount();
     
     // Listen for storage changes (when user logs in/out in another tab)
     window.addEventListener('storage', checkUser);
     
+    // Update cart count periodically
+    const interval = setInterval(updateCartCount, 1000);
+    
     return () => {
       window.removeEventListener('storage', checkUser);
+      clearInterval(interval);
     };
   }, []);
 
-  const handleSignOut = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-
-    toast({
-      title: "Success",
-      description: "You have been signed out successfully.",
-    });
-
-    router.push("/");
-    router.refresh();
+  const handleSignOut = async () => {
+    const response = await authAPI.logout();
+    if (response.success) {
+      setUser(null);
+      setCartItemCount(0);
+      toast({
+        title: "Success",
+        description: response.message || "You have been signed out successfully.",
+      });
+      router.push("/");
+      router.refresh();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: response.error || "Failed to sign out",
+      });
+    }
   };
 
   const toggleMenu = () => {
@@ -112,9 +112,11 @@ export default function Header() {
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  2
-                </span>
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
               </Button>
             </Link>
             {user ? (
@@ -162,9 +164,11 @@ export default function Header() {
             <Link href="/cart" className="mr-4">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  2
-                </span>
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
               </Button>
             </Link>
             <button

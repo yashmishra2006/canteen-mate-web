@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,33 +14,29 @@ import {
   ShoppingBag,
   ArrowRight
 } from "lucide-react";
-
-// Sample cart data structure
-interface CartItem {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-}
+import { cartAPI, ordersAPI, authAPI, CartItem } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    {
-      id: 1,
-      name: "Masala Dosa",
-      price: 80,
-      quantity: 2,
-      image: "https://images.pexels.com/photos/5560763/pexels-photo-5560763.jpeg",
-    },
-    {
-      id: 2,
-      name: "Samosa",
-      price: 25,
-      quantity: 3,
-      image: "https://images.pexels.com/photos/9609838/pexels-photo-9609838.jpeg",
-    },
-  ]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [placing, setPlacing] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // Delivery fee
+  const deliveryFee = 20;
+
+  // Load cart items
+  useEffect(() => {
+    const loadCart = () => {
+      const items = cartAPI.getCart();
+      setCartItems(items);
+      setLoading(false);
+    };
+
+    loadCart();
+  }, []);
 
   // Calculate subtotal
   const subtotal = cartItems.reduce(
@@ -47,26 +44,95 @@ export default function CartPage() {
     0
   );
 
-  // Delivery fee
-  const deliveryFee = 20;
-
   // Calculate total
-  const total = subtotal + deliveryFee;
+  const total = subtotal + (cartItems.length > 0 ? deliveryFee : 0);
 
   // Update item quantity
-  const updateQuantity = (itemId: number, newQuantity: number) => {
+  const updateQuantity = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
-    setCartItems(
-      cartItems.map((item) =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-    );
+    
+    const response = await cartAPI.updateCartItem(itemId, newQuantity);
+    if (response.success && response.data) {
+      setCartItems(response.data);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: response.error || "Failed to update cart",
+      });
+    }
   };
 
   // Remove item from cart
-  const removeItem = (itemId: number) => {
-    setCartItems(cartItems.filter((item) => item.id !== itemId));
+  const removeItem = async (itemId: number) => {
+    const response = await cartAPI.removeFromCart(itemId);
+    if (response.success && response.data) {
+      setCartItems(response.data);
+      toast({
+        title: "Item Removed",
+        description: "Item has been removed from your cart.",
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: response.error || "Failed to remove item",
+      });
+    }
   };
+
+  // Place order
+  const placeOrder = async () => {
+    const user = authAPI.getCurrentUser();
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please log in to place an order.",
+      });
+      router.push("/login");
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Empty Cart",
+        description: "Please add items to your cart before placing an order.",
+      });
+      return;
+    }
+
+    setPlacing(true);
+    const response = await ordersAPI.createOrder(cartItems);
+    
+    if (response.success) {
+      setCartItems([]);
+      toast({
+        title: "Order Placed Successfully",
+        description: `Your order #${response.data?.id.slice(-6)} has been placed.`,
+      });
+      router.push("/orders");
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Order Failed",
+        description: response.error || "Failed to place order",
+      });
+    }
+    setPlacing(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading cart...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (cartItems.length === 0) {
     return (
@@ -155,19 +221,34 @@ export default function CartPage() {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">₹{subtotal}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Delivery Fee</span>
-                  <span className="font-medium">₹{deliveryFee}</span>
-                </div>
+                {cartItems.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Delivery Fee</span>
+                    <span className="font-medium">₹{deliveryFee}</span>
+                  </div>
+                )}
                 <div className="border-t pt-4">
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
                     <span className="font-semibold text-red-600">₹{total}</span>
                   </div>
                 </div>
-                <Button className="w-full bg-red-600 hover:bg-red-700 mt-4">
-                  <span>Proceed to Checkout</span>
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button 
+                  className="w-full bg-red-600 hover:bg-red-700 mt-4"
+                  onClick={placeOrder}
+                  disabled={placing || cartItems.length === 0}
+                >
+                  {placing ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full"></div>
+                      Placing Order...
+                    </div>
+                  ) : (
+                    <>
+                      <span>Proceed to Checkout</span>
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>

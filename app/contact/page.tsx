@@ -25,6 +25,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { contactAPI } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 // Form schema
 const contactFormSchema = z.object({
@@ -39,7 +41,7 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Initialize form
   const form = useForm<ContactFormValues>({
@@ -53,20 +55,39 @@ export default function ContactPage() {
   });
 
   // Handle form submission
-  const onSubmit = (data: ContactFormValues) => {
+  const onSubmit = async (data: ContactFormValues) => {
     setIsSubmitting(true);
-    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Form submitted:", data);
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      form.reset();
+    try {
+      const response = await contactAPI.sendMessage(
+        data.name,
+        data.email,
+        data.subject,
+        data.message
+      );
       
-      // Reset success message after 5 seconds
-      setTimeout(() => setIsSuccess(false), 5000);
-    }, 1500);
+      if (response.success) {
+        setIsSuccess(true);
+        form.reset();
+        toast({
+          title: "Message Sent",
+          description: response.message || "Thank you for your message! We'll get back to you soon.",
+        });
+        
+        // Reset success message after 5 seconds
+        setTimeout(() => setIsSuccess(false), 5000);
+      } else {
+        throw new Error(response.error || "Failed to send message");
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   return (
@@ -87,13 +108,6 @@ export default function ContactPage() {
             <div className="mb-6 bg-green-50 text-green-700 p-4 rounded-md flex items-center">
               <Check className="h-5 w-5 mr-2" />
               <span>Thank you for your message! We'll get back to you soon.</span>
-            </div>
-          )}
-          
-          {error && (
-            <div className="mb-6 bg-red-50 text-red-700 p-4 rounded-md flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
             </div>
           )}
 
