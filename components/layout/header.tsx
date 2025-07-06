@@ -5,8 +5,6 @@ import { useState, useEffect } from "react";
 import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/layout/logo";
-import { supabase } from "@/lib/supabase";
-import { User as SupabaseUser } from "@supabase/supabase-js";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,48 +17,58 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
+interface User {
+  email: string;
+  name: string;
+  isLoggedIn: boolean;
+}
+
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+    const checkUser = () => {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          if (parsedUser.isLoggedIn) {
+            setUser(parsedUser);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
     };
 
-    getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
+    checkUser();
+    
+    // Listen for storage changes (when user logs in/out in another tab)
+    window.addEventListener('storage', checkUser);
+    
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener('storage', checkUser);
     };
   }, []);
 
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+  const handleSignOut = () => {
+    localStorage.removeItem('user');
+    setUser(null);
 
-      toast({
-        title: "Success",
-        description: "You have been signed out successfully.",
-      });
+    toast({
+      title: "Success",
+      description: "You have been signed out successfully.",
+    });
 
-      router.push("/");
-      router.refresh();
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to sign out",
-      });
-    }
+    router.push("/");
+    router.refresh();
   };
 
   const toggleMenu = () => {
@@ -115,7 +123,7 @@ export default function Header() {
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-red-100 text-red-600">
-                        {getInitials(user.user_metadata.full_name || user.email)}
+                        {getInitials(user.name || user.email)}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -123,7 +131,7 @@ export default function Header() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.user_metadata.full_name}</p>
+                      <p className="text-sm font-medium leading-none">{user.name}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>

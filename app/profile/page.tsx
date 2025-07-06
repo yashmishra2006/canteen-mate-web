@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
-import { User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+
+interface User {
+  email: string;
+  name: string;
+  isLoggedIn: boolean;
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,33 +18,30 @@ export default function ProfilePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Please login to view your profile",
-        });
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.isLoggedIn) {
+          setUser(parsedUser);
+        } else {
+          router.push("/login");
+        }
+      } catch (error) {
         router.push("/login");
-        return;
       }
-      setUser(user);
-    };
-
-    getUser();
-  }, [router, toast]);
-
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    } else {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to sign out",
+        description: "Please login to view your profile",
       });
-      return;
+      router.push("/login");
     }
+  }, [router, toast]);
+
+  const handleSignOut = () => {
+    localStorage.removeItem('user');
     
     toast({
       title: "Success",
@@ -52,7 +53,13 @@ export default function ProfilePage() {
   };
 
   if (!user) {
-    return null;
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="text-center">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -68,11 +75,11 @@ export default function ProfilePage() {
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Full Name</label>
-            <p className="mt-1">{user.user_metadata.full_name}</p>
+            <p className="mt-1">{user.name}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-500">Account Created</label>
-            <p className="mt-1">{new Date(user.created_at).toLocaleDateString()}</p>
+            <label className="text-sm font-medium text-gray-500">Account Status</label>
+            <p className="mt-1">Active</p>
           </div>
           <div className="pt-4">
             <Button 

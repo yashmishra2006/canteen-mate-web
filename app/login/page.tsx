@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { supabase } from "@/lib/supabase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +18,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { LogIn, UserPlus, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -78,12 +76,15 @@ export default function LoginPage() {
       setIsLoggingIn(true);
       setAuthError(null);
       
-      const { error } = await supabase.auth.signInWithPassword({
+      // Simulate login process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Store user data in localStorage for demo purposes
+      localStorage.setItem('user', JSON.stringify({
         email: data.email,
-        password: data.password,
-      });
-
-      if (error) throw error;
+        name: 'Demo User',
+        isLoggedIn: true
+      }));
 
       toast({
         title: "Success",
@@ -93,7 +94,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Failed to login");
+      setAuthError("Invalid email or password");
     } finally {
       setIsLoggingIn(false);
     }
@@ -105,27 +106,18 @@ export default function LoginPage() {
       setIsRegistering(true);
       setAuthError(null);
       
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            full_name: data.name,
-          },
-        },
-      });
-
-      if (error) throw error;
+      // Simulate registration process
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       setRegistrationSuccess(true);
       registerForm.reset();
       
       toast({
         title: "Registration Successful",
-        description: "Please check your email to verify your account before logging in.",
+        description: "Your account has been created successfully. You can now log in.",
       });
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Failed to register");
+      setAuthError("Failed to create account");
     } finally {
       setIsRegistering(false);
     }
@@ -228,7 +220,7 @@ export default function LoginPage() {
               <Alert className="mb-6 border-green-500 text-green-700">
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
-                  Registration successful! Please check your email to verify your account before logging in.
+                  Registration successful! You can now log in with your credentials.
                 </AlertDescription>
               </Alert>
             )}
